@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz do nauki</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.quiz-container {
+  background: #fff;
+  max-width: 600px;
+  width: 100%;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+
+h1 { text-align: center; }
+
+.question {
+  font-size: 22px;
+  margin-bottom: 20px;
+  white-space: pre-wrap;
+}
+
+.answers button,
+.open-answer textarea {
+  width: 100%;
+  font-size: 18px;
+  padding: 14px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 2px solid #ccc;
+  box-sizing: border-box;
+}
+
+.answers button { cursor: pointer; background: #fff; }
+.answers button.correct { background: #28a745; color: #fff; }
+.answers button.wrong { background: #dc3545; color: #fff; }
+
+.next-btn {
+  width: 100%;
+  padding: 16px;
+  font-size: 20px;
+  border-radius: 10px;
+  border: none;
+  background: #007bff;
+  color: #fff;
+  cursor: pointer;
+}
+
+.check-btn { background: #17a2b8; }
+
+.feedback { font-size: 18px; margin-bottom: 12px; white-space: pre-wrap; }
+.result { font-size: 26px; text-align: center; }
+</style>
+</head>
+
+<body>
+<div class="quiz-container">
+  <h1>Quiz do nauki</h1>
+  <div id="quiz"></div>
+</div>
+
+<script>
+let questions = [];
+let currentQuestion = 0;
+let score = 0;
+const quizEl = document.getElementById("quiz");
+
+/* ================= CSV ================= */
+fetch("questions.csv")
+  .then(r => r.text())
+  .then(text => {
+    const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim());
+    lines.slice(1).forEach(line => {
+      const p = line.split(";");
+      if (p[0] === "multiple") {
+        const answers = p.slice(2,6).map(x => x.replace(/^"|"$/g,"").trim());
+        const correct = p[6] ? p[6].replace(/^"|"$/g,"").trim() : "";
+        questions.push({
+          type: "multiple",
+          question: p[1].replace(/\\n/g, "\n"),
+          answers,
+          correct: answers.indexOf(correct)
+        });
+      } else if (p[0] === "open") {
+        const correct = p.slice(6).join(";").replace(/^"|"$/g,"").replace(/\\n/g,"\n").trim();
+        questions.push({
+          type: "open",
+          question: p[1].replace(/\\n/g, "\n"),
+          correct
+        });
+      }
+    });
+    showQuestion();
+  });
+
+/* ================= QUIZ ================= */
+function normalizeLines(str) {
+  return str.replace(/\r\n/g,"\n").replace(/\r/g,"\n")
+            .split("\n").map(l => l.trim()).filter(l => l.length);
+}
+
+function compareAnswers(user, correct) {
+  const userLines = normalizeLines(user);
+  const correctLines = normalizeLines(correct);
+  if (userLines.length !== correctLines.length) return false;
+  return userLines.every((line,i) => line.toLowerCase() === correctLines[i].toLowerCase());
+}
+
+function showQuestion() {
+  const q = questions[currentQuestion];
+  quizEl.innerHTML = "";
+
+  const qEl = document.createElement("div");
+  qEl.className = "question";
+  qEl.textContent = q.question;
+  quizEl.appendChild(qEl);
+
+  if (q.type === "multiple") {
+    const ansEl = document.createElement("div");
+    ansEl.className = "answers";
+    q.answers.forEach((a,i) => {
+      if (!a) return;
+      const b = document.createElement("button");
+      b.textContent = a;
+      b.onclick = () => checkMultiple(b,i);
+      ansEl.appendChild(b);
+    });
+    quizEl.appendChild(ansEl);
+  }
+
+  if (q.type === "open") {
+    const openEl = document.createElement("div");
+    openEl.className = "open-answer";
+
+    const ta = document.createElement("textarea");
+    ta.rows = 6;
+    openEl.appendChild(ta);
+
+    const checkBtn = document.createElement("button");
+    checkBtn.textContent = "Sprawdź";
+    checkBtn.className = "next-btn check-btn";
+
+    const feedback = document.createElement("div");
+    feedback.className = "feedback";
+
+    checkBtn.onclick = () => {
+      ta.disabled = true;
+      checkBtn.disabled = true;
+
+      if (compareAnswers(ta.value, q.correct)) {
+        checkBtn.style.background = "#28a745";
+        checkBtn.textContent = "✔ Poprawnie";
+        feedback.style.color = "#28a745";
+        feedback.textContent = "Dobra odpowiedź!";
+        score++;
+      } else {
+        checkBtn.style.background = "#dc3545";
+        checkBtn.textContent = "✖ Źle";
+        feedback.style.color = "#dc3545";
+        feedback.textContent = "Poprawna odpowiedź:\n" + q.correct;
+      }
+
+      const next = document.createElement("button");
+      next.textContent = "Dalej";
+      next.className = "next-btn";
+      next.onclick = nextQuestion;
+
+      quizEl.appendChild(feedback);
+      quizEl.appendChild(next);
+    };
+
+    quizEl.appendChild(openEl);
+    quizEl.appendChild(checkBtn);
+  }
+}
+
+function checkMultiple(btn,i) {
+  const q = questions[currentQuestion];
+  document.querySelectorAll(".answers button").forEach(b => b.disabled = true);
+
+  if (i === q.correct) {
+    btn.classList.add("correct");
+    score++;
+  } else {
+    btn.classList.add("wrong");
+    document.querySelectorAll(".answers button")[q.correct].classList.add("correct");
+  }
+
+  const next = document.createElement("button");
+  next.textContent = "Dalej";
+  next.className = "next-btn";
+  next.onclick = nextQuestion;
+  quizEl.appendChild(next);
+}
+
+function nextQuestion() {
+  currentQuestion++;
+  currentQuestion < questions.length ? showQuestion() : showResult();
+}
+
+function showResult() {
+  quizEl.innerHTML = `<div class="result">Twój wynik: ${score}/${questions.length}</div>`;
+
+  const restartBtn = document.createElement("button");
+  restartBtn.textContent = "Restartuj quiz";
+  restartBtn.className = "next-btn";
+  restartBtn.onclick = () => {
+    currentQuestion = 0;
+    score = 0;
+    showQuestion();
+  };
+
+  quizEl.appendChild(restartBtn);
+}
+</script>
+</body>
+</html>

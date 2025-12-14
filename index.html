@@ -1,122 +1,199 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quiz do nauki</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz do nauki</title>
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f4f6f8;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  margin: 0;
-}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
 
-.quiz-container {
-  background: #fff;
-  max-width: 600px;
-  width: 100%;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,.1);
-}
+    .quiz-container {
+      background: #ffffff;
+      width: 100%;
+      max-width: 600px;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
 
-h1 { text-align: center; }
+    h1 {
+      font-size: 28px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
 
-.question {
-  font-size: 22px;
-  margin-bottom: 20px;
-  white-space: pre-wrap;
-}
+    .question {
+      font-size: 22px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+    }
 
-.answers button,
-.open-answer textarea {
-  width: 100%;
-  font-size: 18px;
-  padding: 14px;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  border: 2px solid #ccc;
-  box-sizing: border-box;
-}
+    .answers button {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 12px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: 2px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+    }
 
-.answers button { cursor: pointer; background: #fff; }
-.answers button.correct { background: #28a745; color: #fff; }
-.answers button.wrong { background: #dc3545; color: #fff; }
+    .answers button.correct {
+      background: #28a745;
+      color: #fff;
+      border-color: #28a745;
+    }
 
-.next-btn {
-  width: 100%;
-  padding: 16px;
-  font-size: 20px;
-  border-radius: 10px;
-  border: none;
-  background: #007bff;
-  color: #fff;
-  cursor: pointer;
-}
+    .answers button.wrong {
+      background: #dc3545;
+      color: #fff;
+      border-color: #dc3545;
+    }
 
-.check-btn { background: #17a2b8; }
+    .next-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 20px;
+      border: none;
+      border-radius: 10px;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+      margin-top: 10px;
+    }
 
-.feedback { font-size: 18px; margin-bottom: 12px; white-space: pre-wrap; }
-.result { font-size: 26px; text-align: center; }
-</style>
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      font-size: 18px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 2px solid #ccc;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    .feedback {
+      font-size: 18px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+
+    .result {
+      font-size: 26px;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
-<div class="quiz-container">
-  <h1>Quiz do nauki</h1>
-  <div id="quiz"></div>
-</div>
+  <div class="quiz-container">
+    <h1>Quiz do nauki</h1>
+    <div id="quiz"></div>
+  </div>
 
 <script>
+let allQuestions = [];
 let questions = [];
 let currentQuestion = 0;
 let score = 0;
+let wrongQuestions = []; // tablica pytań źle rozwiązanych
+
 const quizEl = document.getElementById("quiz");
 
 /* ================= CSV ================= */
 fetch("questions.csv")
   .then(r => r.text())
   .then(text => {
-    const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim());
+    const lines = text
+      .replace(/^\uFEFF/, "")
+      .split(/\r?\n/)
+      .filter(l => l.trim());
+
     lines.slice(1).forEach(line => {
       const p = line.split(";");
+
       if (p[0] === "multiple") {
-        const answers = p.slice(2,6).map(x => x.replace(/^"|"$/g,"").trim());
-        const correct = p[6] ? p[6].replace(/^"|"$/g,"").trim() : "";
-        questions.push({
+        const answers = p.slice(2,6).map(a => a.replace(/^"|"$/g,"").trim());
+        const correct = p[6]?.replace(/^"|"$/g,"").trim();
+
+        allQuestions.push({
           type: "multiple",
-          question: p[1].replace(/\\n/g, "\n"),
+          question: p[1].replace(/\\n/g,"\n"),
           answers,
           correct: answers.indexOf(correct)
         });
+
       } else if (p[0] === "open") {
-        const correct = p.slice(6).join(";").replace(/^"|"$/g,"").replace(/\\n/g,"\n").trim();
-        questions.push({
+        const correct = p.slice(6).join(";")
+          .replace(/^"|"$/g,"")
+          .replace(/\\n/g,"\n")
+          .trim();
+
+        allQuestions.push({
           type: "open",
-          question: p[1].replace(/\\n/g, "\n"),
+          question: p[1].replace(/\\n/g,"\n"),
           correct
         });
       }
     });
-    showQuestion();
+
+    showStartScreen();
   });
+
+/* ================= START ================= */
+function showStartScreen() {
+  quizEl.innerHTML = `
+    <h2>Wybierz tryb</h2>
+    <button class="next-btn" onclick="startAll()">📘 Test z całej bazy</button>
+    <button class="next-btn" onclick="startExam()">📝 Egzamin (40 losowych pytań)</button>
+  `;
+}
+
+function startAll() {
+  questions = [...allQuestions];
+  wrongQuestions = [];
+  startQuiz();
+}
+
+function startExam() {
+  questions = shuffle([...allQuestions]).slice(0, 40);
+  wrongQuestions = [];
+  startQuiz();
+}
+
+function startQuiz() {
+  currentQuestion = 0;
+  score = 0;
+  showQuestion();
+}
 
 /* ================= QUIZ ================= */
 function normalizeLines(str) {
-  return str.replace(/\r\n/g,"\n").replace(/\r/g,"\n")
-            .split("\n").map(l => l.trim()).filter(l => l.length);
+  return str
+    .replace(/\r\n/g,"\n")
+    .replace(/\r/g,"\n")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
 }
 
 function compareAnswers(user, correct) {
-  const userLines = normalizeLines(user);
-  const correctLines = normalizeLines(correct);
-  if (userLines.length !== correctLines.length) return false;
-  return userLines.every((line,i) => line.toLowerCase() === correctLines[i].toLowerCase());
+  const u = normalizeLines(user);
+  const c = normalizeLines(correct);
+  if (u.length !== c.length) return false;
+  return u.every((l,i) => l.toLowerCase() === c[i].toLowerCase());
 }
 
 function showQuestion() {
@@ -125,12 +202,13 @@ function showQuestion() {
 
   const qEl = document.createElement("div");
   qEl.className = "question";
-  qEl.textContent = q.question;
+  qEl.textContent = `${currentQuestion + 1}/${questions.length}\n\n${q.question}`;
   quizEl.appendChild(qEl);
 
   if (q.type === "multiple") {
     const ansEl = document.createElement("div");
     ansEl.className = "answers";
+
     q.answers.forEach((a,i) => {
       if (!a) return;
       const b = document.createElement("button");
@@ -138,20 +216,16 @@ function showQuestion() {
       b.onclick = () => checkMultiple(b,i);
       ansEl.appendChild(b);
     });
+
     quizEl.appendChild(ansEl);
   }
 
   if (q.type === "open") {
-    const openEl = document.createElement("div");
-    openEl.className = "open-answer";
-
     const ta = document.createElement("textarea");
-    ta.rows = 6;
-    openEl.appendChild(ta);
 
     const checkBtn = document.createElement("button");
     checkBtn.textContent = "Sprawdź";
-    checkBtn.className = "next-btn check-btn";
+    checkBtn.className = "next-btn";
 
     const feedback = document.createElement("div");
     feedback.className = "feedback";
@@ -171,6 +245,7 @@ function showQuestion() {
         checkBtn.textContent = "✖ Źle";
         feedback.style.color = "#dc3545";
         feedback.textContent = "Poprawna odpowiedź:\n" + q.correct;
+        wrongQuestions.push(q); // zapisanie do powtórki
       }
 
       const next = document.createElement("button");
@@ -182,7 +257,7 @@ function showQuestion() {
       quizEl.appendChild(next);
     };
 
-    quizEl.appendChild(openEl);
+    quizEl.appendChild(ta);
     quizEl.appendChild(checkBtn);
   }
 }
@@ -197,6 +272,7 @@ function checkMultiple(btn,i) {
   } else {
     btn.classList.add("wrong");
     document.querySelectorAll(".answers button")[q.correct].classList.add("correct");
+    wrongQuestions.push(q); // zapisanie pytania do powtórki
   }
 
   const next = document.createElement("button");
@@ -212,18 +288,30 @@ function nextQuestion() {
 }
 
 function showResult() {
-  quizEl.innerHTML = `<div class="result">Twój wynik: ${score}/${questions.length}</div>`;
+  let html = `
+    <div class="result">Twój wynik: ${score}/${questions.length}</div>
+    <button class="next-btn" onclick="showStartScreen()">🔄 Wróć do menu</button>
+  `;
 
-  const restartBtn = document.createElement("button");
-  restartBtn.textContent = "Restartuj quiz";
-  restartBtn.className = "next-btn";
-  restartBtn.onclick = () => {
-    currentQuestion = 0;
-    score = 0;
-    showQuestion();
-  };
+  if (wrongQuestions.length > 0) {
+    html += `<button class="next-btn" onclick="repeatWrong()">🔁 Powtórz błędne odpowiedzi</button>`;
+  }
 
-  quizEl.appendChild(restartBtn);
+  quizEl.innerHTML = html;
+}
+
+function repeatWrong() {
+  questions = [...wrongQuestions];
+  wrongQuestions = [];
+  startQuiz();
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 </script>
 </body>
